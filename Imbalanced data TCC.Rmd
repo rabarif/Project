@@ -1,0 +1,123 @@
+---
+title: "Imbalanced Data TCC"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Imbalance Data 
+#Use Over & Under sampling 
+#Use ROSE
+
+```{r}
+TCC <- read.csv(file = "C:/users/arifr/Downloads/TCC.csv", header=TRUE)
+str(TCC)
+#change (Y) variable default to as.factor
+TCC$default <- as.factor(TCC$default)
+summary(TCC)
+#Y class distribution 
+table(TCC$default)
+#plot the classes for Y
+barplot(prop.table(table(TCC$default)),
+        col = rainbow(2),
+        ylim = c(0, 1),
+        main = "Class Distribution")
+#class imbalance 
+```
+#Splitting data into TRAIN and TEST
+```{r}
+set.seed(123)
+split_data <- sample(2, nrow(TCC), replace = TRUE, prob = c(0.7, 0.3))
+train <- TCC[split_data==1,]
+test <- TCC[split_data==2,]
+```
+#Data for Predictive model (TRAIN)
+```{r}
+#In training dataset class in imbalanced 
+table(train$default)
+prop.table(table(train$default))
+summary(train)
+```
+#Create Model TRAIN (Random Forest)
+```{r}
+library(randomForest)
+rf_train <- randomForest(default ~., data = train)
+```
+#Evaluate Model (Test)
+```{r}
+library(caret)
+library(e1071)
+confusionMatrix(predict(rf_train, test), test$default, positive = '1')
+#TP 6635 TN 717 Accuracy 0.82
+#No information is TP+FP 6635+374/total test 8960 -> accuracy 0.78
+#sensitivity is accuratly predict class 1 which is TN 717/Total column 1 (FN 1234 +TN 717)=1951 -> 717/1951=0.36
+#specificity is accuratly predict class 0 which is TP 6635 and TP 6635+FP374=7009 -> 6635/7009 = 0.94
+#Prediction model is dominated for class 0 and not class 1
+```
+#Oversampling using (Train)
+```{r}
+library(ROSE)
+#n = table(train$default) take class 0 number (16355)
+# -> 16355*2 = 32,710
+over <-ovun.sample(default ~., data = train, method = "over", N = 32710)$data
+table(over$default)
+#should the same value from n = table(train$default) which is 16355 for class 0 and 1
+summary(over)
+#Create random forest over
+rfover <- randomForest(default ~., data = over)
+#Create confusion matrix
+confusionMatrix(predict(rfover, test), test$default, positive = '1')
+#Overall accuracy decresed from 0.82 to 0.81
+#Interested in predicting class 1 sensitivity which went from 0.36 to 0.45 (increased)
+#specificity was 0.94 down to 0.90 (decreased)
+#By doing oversampling we have improved sensitivity
+```
+#Undersampling
+```{r}
+#n = table(train$default) take class 1 number (4685) 
+# -> 4685*2 = 9,370
+under <- ovun.sample(default ~., data = train, method = "under", N = 9370)$data
+table(under$default)
+#create Random Forest under
+rfunder <- randomForest(default ~., data = under)
+#Confusion Matrix for under Test
+confusionMatrix(predict(rfunder, test), test$default, positive = '1')
+#Concentrate on sensitivity class 1 which went from over sampling 0.45 to 0.63 (increased) Also oversampling (TN) to undersampling (TN) increased from 883 to 1248
+#accuracy decreased from (over) 0.81 to (under) 0.73. 
+```
+#Both Over & Under
+```{r}
+both <- ovun.sample(default ~., data = train, method = "both", p = 0.5, seed = 200, N = 21040)$data
+table(both$default)
+#Not exactly equal class 0 and 1 but close.
+#class 0 -> 10548 & class 1 -> 10492
+#Create Random Sample Test
+rfboth <- randomForest(default ~., data = both)
+#Confusion matrix for test
+confusionMatrix(predict(rfboth, test), test$default, positive = '1')
+#sensitivity is 0.54(both) from 0.63(under) which decreased 
+#accuracy increased from 0.73(under) to 0.79(both)
+```
+#Syntheic Data ROSE
+```{r}
+library(ROSE)
+rose <- ROSE(default ~., data = train, N = 30000, seed = 125 )$data
+table(rose$default)
+summary(rose)
+#since rose created more data if you observe remaining variables such as limit_balance all the way to Pay_Amt6 all minimum to maximum values changed a new min or max is created. 
+#since max and min values have to stay in range rose might not be the best example. 
+#Random Forest
+rfrose <- randomForest(default ~., data = rose)
+#Confusion Matrix 
+confusionMatrix(predict(rfrose, test), test$default, positive = '1')
+#TN increased from 1059(both) to 1519(rose)
+#sensitivity 0.54(both) to 0.77(rose) increased
+#specificity 0.85(both) to 0.58(rose) decreased
+#accuracy 0.79(both) to 0.62(rose)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
