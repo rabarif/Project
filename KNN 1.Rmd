@@ -1,0 +1,129 @@
+---
+title: "KNN 1"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Data cleaning 
+```{r}
+TCC <- read.csv(file = "C:/users/arifr/Downloads/TCC.csv", header=TRUE)
+colnames(TCC)
+str(TCC)
+summary(TCC)
+#Check unique values 
+apply(TCC,2, function(x) length(unique(x)))
+#Check missing data
+sapply(TCC, function(x) sum(is.na(x)))
+#plot missing values
+library(DataExplorer)
+PlotMissing(TCC)
+```
+#Correlation 
+```{r}
+# used spearman here to take into account the factorial variables
+correlation <- cor(TCC, method = "spearman")
+corrplot::corrplot(correlation)
+
+library(GGally)
+#ggcorr only outputs numeric attributes 
+ggcorr(correlation)
+#correlation_pearson <- cor(TCC, method="pearson")
+#corrplot::corrplot(correlation_pearson) # Pearson correlation is used to detect highly correlated variables amongst the numerical ones.
+```
+From the spearman correlation, we notice a 'high' correlation between:
+- MARRIAGE and AGE. We suggest removing AGE (due to higher amount of levels). The spearman correlation is: -0.4628100204 (approx. -0.5)
+- PAY_0 to PAY_6. The spearman correlation is between 0.46 to 0.82. We suggest keeping PAY_#=3 (the correlation between PAY_3 and the other PAY is 0.55 to 0.80).
+- BILL_AMT1 to BILL_AMT6. The spearman corr is between 0.73 to 0.91. We suggest keepung BILL_AMT3 (highest correlation)
+- PAY_AMT1 to PAY_AMT6. Spearm corr: 0.455 to 0.54. We suggest keeping PAY_AMT3 (0.519 to 0.533).
+```{r}
+class(TCC)
+#Create new dataframe for variables we are keeping
+#Reduced down to 8 attributes from original 24
+new_df <- TCC[-c(5:7,9:13,15:19,21:23)]
+new_df
+correlation[,c("LIMIT_BAL", "MARRIAGE", "AGE", "PAY_2")]
+#check variance?
+sapply(TCC, var)
+sapply(new_df, var)
+```
+#Normalize funtion
+```{r}
+normalize <- function(x) { 
+  norm <- ((x - min(x))/(max(x)- min(x))) 
+  return (norm) 
+  }
+```
+#Normalize data 
+#Only normalize data with large range column such as limit balance, Bill_AMT3 and Pay_AMT3
+```{r}
+df_normalize <- as.data.frame(lapply(new_df[, c(1,6,7)], normalize))
+head(df_normalize)
+```
+#Add the remaining columns back to the dataframe such as sex, educaiton, marriage, Pay_AMT3 and Default
+```{r}
+df_normalize <- cbind(df_normalize, new_df[, c(2,3,4,5,8)])
+head(df_normalize)
+```
+#check data (x) and (y) variables are num/int
+```{r}
+str(df_normalize)
+summary(df_normalize)
+```
+#Do you convert integer values that are categorical to as.factor before running KNN?
+#Right now set up as int and numbers 
+```{r}
+#Random Seed
+set.seed(3000)
+```
+#split data into Train(70%) and Testing(30%) 
+```{r}
+dfn.split <- sample(2, nrow(df_normalize),
+                    replace = TRUE,
+                    prob = c(2/3, 1/3))
+```
+# Create train and test data with (X) variables 
+```{r}
+dfn.train <- df_normalize[dfn.split == 1, 1:7]
+dfn.test <- df_normalize[dfn.split == 2, 1:7]
+```
+# Create outcomes labels with (Y) variable 
+```{r}
+dfn.train.labels <- df_normalize[dfn.split == 1, 8]
+dfn.test.labels <- df_normalize[dfn.split == 2, 8]
+```
+#Test Classifier
+#K = # of neighbors to compare, can check several k values to check outcomes
+#cl = true class
+```{r}
+library(class)
+dfn.pred <- knn(train = dfn.train,
+                test = dfn.test,
+                cl = dfn.train.labels,
+                k = 7)
+```
+# Create table to check outcomes with different k
+```{r}
+table(dfn.pred, dfn.test.labels)
+
+```
+#K=7 to K=11
+#TN went from 7179 to 7298 (increased) -> Good
+#TP went from 510 to 466 (decreased) -> Bad
+#Better results with K=7
+Accuracy rate of 77%
+(TP+TN)/Total -> (510+7179)/9934=0.77
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

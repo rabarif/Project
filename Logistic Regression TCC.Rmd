@@ -1,0 +1,80 @@
+---
+title: "Logistic Regression TCC"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Logistic Regression TCC
+This example used Train data to build model. Test data for model predictive ability and TRAIN data for ROC/AUC calculation. 
+Also used (corr) in summary of the model 
+```{r}
+TCC <- read.csv(file = "C:/users/arifr/Downloads/TCC_N.csv", header = T, stringsAsFactors = T)
+#(Y) variable and is int  Y = Default 
+#(X) variables are all int
+str(TCC)
+summary(TCC)
+```
+#Split into Train and Test
+```{r}
+#library caTools is used for splitting function 
+library(caTools)
+#Split data into 70% Train and 30% Test
+#After split function the data is split into Train (18,750 obs) 63% and Test (11,250 obs) 37%
+split <- sample.split(TCC, SplitRatio = 0.7)
+split
+train <- subset(TCC, split == "TRUE")
+test <- subset(TCC, split == "FALSE")
+```
+#Create model using training data 
+```{r}
+#Use glm function with Y variable and train data 
+model <- glm(default ~., family=binomial(link='logit'), data=train)
+summary(model, corr=T)
+#for significant value the lowest p value is for Limit_Bal and Pay_3. Residual dev 18358 and AIC 18374. We can try to remove some attributes with low significant value to see if the residual dev and AIC will go down and improve the model. 
+```
+#Table of deviance to asses model 
+```{r}
+anova(model, test="Chisq")
+#Another way to asses model fit is McFadden R2
+library(pscl)
+pR2(model)
+```
+#Predictive ability of the model (Test)
+```{r}
+#using Testing data and only X variables 
+results <- predict(model, test, type ='response')
+results
+test
+#Confusion Matrix 
+t <-table(ActualValue=test$default, PredictedValue=results>0.5)
+#t give you TP 8671 TN 103 -> (8591+102)/(11250)=77%. FN 79 and FP 2478
+t
+#Accuracy 
+sum(diag(t))/sum(t)
+# accuracy is 0.772 or 77%
+```
+#ROC <- Train data  ROC is Used to calculate treshold 
+```{r}
+results <- predict(model, train, type = "response" )
+library(ROCR)
+ROCRPred = prediction(results, train$default)
+ROCRPref <- performance(ROCRPred, "tpr", "fpr")
+#Plot the graph 
+plot(ROCRPref)
+plot(ROCRPref, colorize=TRUE, print.cutoffs.at=seq(0.1, by=0.1))
+auc <- performance(ROCRPred, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+#auc is 0.663 
+```
+
+```{r}
+
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
